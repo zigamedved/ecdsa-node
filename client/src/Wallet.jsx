@@ -42,3 +42,10 @@ function Wallet({ address, setAddress, balance, setBalance, privateKey, setPriva
 }
 
 export default Wallet;
+
+// TODO
+// - add additional fields on transaction component. Fields like sender transaction, (receiver) transaction, signature (and amount).
+// - add generate signature component
+
+// TODO server
+// - validate signature etc..., add status code...
