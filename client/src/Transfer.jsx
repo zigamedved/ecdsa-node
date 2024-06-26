@@ -1,24 +1,42 @@
 import { useState } from "react";
 import server from "./server";
 
-function Transfer({ address, setBalance }) {
+import * as secp from "ethereum-cryptography/secp256k1"
+import { keccak256 } from "ethereum-cryptography/keccak"
+import { toHex, utf8ToBytes } from "ethereum-cryptography/utils"
+
+
+function hashMessage(address,recipient, amount){
+return toHex(keccak256(utf8ToBytes(JSON.stringify({address,recipient,amount}))))
+}
+
+async function getSignature(hashedMessage, privateKey){
+  const signature = await secp.sign(hashedMessage, privateKey, {recovered: true})
+  return signature
+}
+
+function Transfer({}) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+  const [privateKey, setPrivateKey] = useState("")
 
   const setValue = (setter) => (evt) => setter(evt.target.value);
 
   async function transfer(evt) {
     evt.preventDefault();
 
+    const address = toHex(secp.getPublicKey(privateKey, true))
+    const hashedMessage = hashMessage(address, recipient, parseInt(sendAmount))
+    const signature = await getSignature(hashedMessage, privateKey)
+  
     try {
-      const {
-        data: { balance },
-      } = await server.post(`send`, {
-        sender: address,
+      await server.post(`send`, {
+        address,
+        recipient: recipient,
         amount: parseInt(sendAmount),
-        recipient,
+        signature,
+        hashedMessage,
       });
-      setBalance(balance);
     } catch (ex) {
       alert(ex.response.data.message);
     }
@@ -27,6 +45,15 @@ function Transfer({ address, setBalance }) {
   return (
     <form className="container transfer" onSubmit={transfer}>
       <h1>Send Transaction</h1>
+
+      <label>
+        Your private key (needed to sign transaction, won't be saved :D)
+        <input
+          placeholder="..."
+          value={privateKey}
+          onChange={setValue(setPrivateKey)}
+        ></input>
+      </label>
 
       <label>
         Send Amount

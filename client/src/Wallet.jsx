@@ -1,29 +1,18 @@
-import server from "./server";
-import {secp256k1} from "ethereum-cryptography/secp256k1"
-
-import {toHex} from "ethereum-cryptography/utils"
+import axios from 'axios';
 
 
-
-function Wallet({ address, setAddress, balance, setBalance, privateKey, setPrivateKey }) {
+function Wallet({ address, setAddress, balance, setBalance }) {
   async function onChange(evt) {
-    const privateKey = evt.target.value;
-    
-    if(!privateKey.length){
+    const address = evt.target.value;
+    setAddress(address);
+
+    if(!address){
       setBalance(0);
-      setPrivateKey("");
-      setAddress("");
-      return
+    }else{
+      const { data: { balance }} = await axios.get(`http://localhost:3042/balance/${address}`);
+      setBalance(balance);
     }
 
-    setPrivateKey(privateKey)
-    const address = secp256k1.getPublicKey(privateKey)
-    setAddress(toHex(address));
-    const {
-      data: { balance },
-    } = await server.get(`balance/${toHex(address)}`);
-    setBalance(balance);
-  
   }
 
   return (
@@ -31,11 +20,10 @@ function Wallet({ address, setAddress, balance, setBalance, privateKey, setPriva
       <h1>Your Wallet</h1>
 
       <label>
-        Private key
-        <input placeholder="Type in your private key: " value={privateKey} onChange={onChange}></input>
+       Public address
+        <input placeholder="Type in your public address key: " value={address} onChange={onChange}></input>
       </label>
 
-      <div>Public address: {address}</div>
       <div className="balance">Balance: {balance}</div>
     </div>
   );
@@ -43,9 +31,4 @@ function Wallet({ address, setAddress, balance, setBalance, privateKey, setPriva
 
 export default Wallet;
 
-// TODO
-// - add additional fields on transaction component. Fields like sender transaction, (receiver) transaction, signature (and amount).
-// - add generate signature component
 
-// TODO server
-// - validate signature etc..., add status code...

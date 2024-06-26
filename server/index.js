@@ -3,6 +3,11 @@ const app = express();
 const cors = require("cors");
 const port = 3042;
 
+const { toHex, utf8ToBytes} = require("ethereum-cryptography/utils");
+const secp = require("ethereum-cryptography/secp256k1");
+
+const { keccak256 } = require("ethereum-cryptography/keccak");
+
 app.use(cors());
 app.use(express.json());
 
@@ -16,23 +21,43 @@ app.get("/balance/:address", (req, res) => {
   console.info(req.url)
   const { address } = req.params;
   const balance = balances[address] || 0;
+  console.info(`Requested address: ${req.params.address} has balance: ${balance} `)
   res.send({ balance });
 });
+ 
+function hashMessage(address,recipient, amount){
+  return toHex(keccak256(utf8ToBytes(JSON.stringify({address,recipient,amount}))))
+}
 
-app.post("/send", (req, res) => {
-  const { sender, recipient, amount } = req.body;
-  // TODO get a signature from the client side application
-  // recover the public address from the signature
+app.post("/send", async (req, res) => {
+  const { address, recipient, amount, signature, hashedMessage } = req.body;
+  
+  const localHash = hashMessage(address, recipient, amount)
+  if (localHash != hashedMessage){
+    res.status(406).send({ message: "Provided hash does not match the locally calculated one!" });
+    return
+  } 
+  console.info("Great, calculated hash matches the provided one, going to the next step...")
 
-  setInitialBalance(sender);
+  const sig = Uint8Array.from(Object.values(signature[0]))
+  const recoveryBit = signature[1]
+  const publicKey =  secp.recoverPublicKey(hashedMessage, sig, recoveryBit)
+  const verified = secp.verify(sig, hashedMessage, publicKey)
+
+  if ((!verified || !(address.slice(2)==toHex(publicKey.slice(1,33))))){
+    res.status(406).send({ message: "Wrong signature!" });
+    return
+  }
+
+  setInitialBalance(address);
   setInitialBalance(recipient);
 
-  if (balances[sender] < amount) {
+  if (balances[address] < amount) {
     res.status(400).send({ message: "Not enough funds!" });
   } else {
-    balances[sender] -= amount;
+    balances[address] -= amount;
     balances[recipient] += amount;
-    res.send({ balance: balances[sender] });
+    res.send({ balance: balances[address] });
   }
 });
 
