@@ -21,3 +21,7 @@ function App() {
 }
 
 export default App;
+
+
+// TODO:
+// - maybe add history component?
